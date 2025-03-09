@@ -102,8 +102,7 @@ async def stream_callback(client, query: CallbackQuery):
     download_link = f"{URL}{file_id}?hash={get_hash(file_id)}"
 
     try:
-        # بررسی اینکه آیا query.message مقدار صحیحی دارد
-        if query.message and query.message.chat:
+        if query.message:
             if query.message.chat.type == "private":
                 # اگر کاربر در چت خصوصی است، ارسال دکمه‌ها در همان چت خصوصی
                 await client.send_message(
@@ -127,9 +126,19 @@ async def stream_callback(client, query: CallbackQuery):
                         InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query="")
                     ]])
                 )
+        elif query.inline_message_id:
+            # اگر پیام از نوع Inline بوده، از inline_message_id استفاده کنید
+            await client.edit_message_text(
+                chat_id=query.from_user.id,
+                message_id=query.inline_message_id,
+                text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
+                reply_markup=InlineKeyboardMarkup([[ 
+                    InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
+                    InlineKeyboardButton('📥 دانلود', url=download_link)
+                ]])
+            )
         else:
-            # اگر query.message یا query.message.chat مقدار نادرستی داشت
-            logger.error("query.message or query.message.chat is None.")
+            logger.error("No valid message or inline_message_id.")
     
     except Exception as e:
         logger.exception(str(e))
