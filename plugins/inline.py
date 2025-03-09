@@ -62,12 +62,14 @@ async def answer(bot, query):
         await query.answer([], cache_time=0)
         return
 
+    # دریافت اطلاعات فیلم از TMDb API
     movie_info = await get_movie_info(search_text)
     if not movie_info:
         logger.warning(f"⚠️ اطلاعاتی برای '{search_text}' یافت نشد.")
         await query.answer([], cache_time=0, switch_pm_text="❌ فیلمی یافت نشد!")
         return
 
+    # تنظیم دکمه‌ها
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("🎥 نمایش فایل‌های مرتبط", callback_data=f"show_files_{search_text}")],
         [InlineKeyboardButton("📺 تماشای تریلر", url=movie_info['trailer']),
@@ -75,6 +77,7 @@ async def answer(bot, query):
         [InlineKeyboardButton("🔍 جستجوی مجدد", switch_inline_query="")]
     ])
 
+    # تنظیم نتایج برای نمایش
     results = [
         InlineQueryResultArticle(
             id=str(uuid.uuid4()),
@@ -94,4 +97,5 @@ async def answer(bot, query):
         )
     ]
 
-    await query.answer(results, is_personal=True, cache_time=cache_time)
+    # ارسال نتایج به کاربر
+    await query.answer(results, is_personal=True, cache_time=0)
