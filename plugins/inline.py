@@ -91,7 +91,6 @@ async def answer(bot, query):
     except Exception as e:
         logger.exception(str(e))
 
-
 @Client.on_callback_query(filters.regex("^stream_"))
 async def stream_callback(client, query: CallbackQuery):
     """دریافت اطلاعات فایل و ارسال لینک استریم و دانلود"""
@@ -127,10 +126,11 @@ async def stream_callback(client, query: CallbackQuery):
                     ]])
                 )
         elif query.inline_message_id:
-            # اگر پیام از نوع Inline بوده، از inline_message_id استفاده کنید
+            # بررسی اینکه inline_message_id از نوع عددی باشد
+            inline_message_id = int(query.inline_message_id)  # تبدیل به int
             await client.edit_message_text(
                 chat_id=query.from_user.id,
-                message_id=query.inline_message_id,
+                message_id=inline_message_id,
                 text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
                 reply_markup=InlineKeyboardMarkup([[ 
                     InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
