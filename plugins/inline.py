@@ -14,7 +14,9 @@ from TechVJ.util.file_properties import get_hash
 
 # 🔹 تنظیمات لاگ‌گیری برای اشکال‌زدایی
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+
+# تنظیم سطح لاگ‌گیری به DEBUG برای نمایش تمامی لاگ‌ها
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 cache_time = 0 if AUTH_USERS or AUTH_CHANNEL else CACHE_TIME
 
@@ -26,11 +28,15 @@ async def get_movie_info(title):
     """📌 دریافت اطلاعات فیلم از TMDb API
     """
     url = f"{TMDB_BASE_URL}/search/movie?api_key={TMDB_API_KEY}&query={title}"
+    
+    logger.debug(f"در حال ارسال درخواست برای فیلم: {title}")
 
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
+            logger.debug(f"وضعیت پاسخ API: {response.status}")
             if response.status == 200:
                 data = await response.json()
+                logger.debug(f"داده‌های دریافتی از TMDb: {data}")
                 results = data.get("results", [])
                 if results:
                     movie = results[0]
@@ -38,6 +44,7 @@ async def get_movie_info(title):
                     details_url = f"{TMDB_BASE_URL}/movie/{movie_id}?api_key={TMDB_API_KEY}"
                     async with session.get(details_url) as details_response:
                         details = await details_response.json()
+                        logger.debug(f"اطلاعات کامل فیلم: {details}")
                         return {
                             "title": details.get("title"),
                             "year": details.get("release_date", "Unknown").split("-")[0],
@@ -48,6 +55,8 @@ async def get_movie_info(title):
                             "imdb_link": f"https://www.imdb.com/title/{details.get('imdb_id')}/",
                             "trailer": f"https://www.youtube.com/results?search_query={title.replace(' ', '+')}+trailer"
                         }
+            else:
+                logger.error(f"خطا در دریافت داده‌ها از TMDb: {response.status}")
     return None  # ❌ در صورت یافت نشدن اطلاعات
 
 
@@ -55,10 +64,12 @@ async def get_movie_info(title):
 async def answer(bot, query):
     """🔍 جستجوی اینلاین + نمایش اطلاعات TMDb و دکمه‌های اختصاصی
     """
+    logger.debug(f"ورودی جستجو از کاربر: {query.query.strip()}")
     chat_id = await active_connection(str(query.from_user.id))
     search_text = query.query.strip()
 
     if not search_text:
+        logger.debug("ورودی جستجو خالی است")
         await query.answer([], cache_time=0)
         return
 
@@ -98,4 +109,5 @@ async def answer(bot, query):
     ]
 
     # ارسال نتایج به کاربر
+    logger.debug("ارسال نتایج به کاربر")
     await query.answer(results, is_personal=True, cache_time=0)
