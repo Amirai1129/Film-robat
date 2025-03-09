@@ -91,25 +91,29 @@ async def answer(bot, query):
         logger.exception(str(e))
 
 
-@Client.on_callback_query(filters.regex("^stream_"))
-async def stream_callback(client, query: CallbackQuery):
-    """ارسال دکمه‌های پخش و دانلود بدون ارسال مجدد ویدیو"""
-    file_id = query.data.split("_")[1]
-
-    # تولید لینک‌های استریم و دانلود
-    stream_link = f"{URL}watch/{file_id}?hash={get_hash(file_id)}"
-    download_link = f"{URL}{file_id}?hash={get_hash(file_id)}"
-
+@app.on_callback_query(filters.regex("^stream_"))
+async def stream_callback(client: Client, query: CallbackQuery):
+    """نمایش دکمه‌های پخش و دانلود بدون ارسال مجدد ویدیو"""
     try:
-        # ویرایش پیام قبلی و افزودن دکمه‌های استریم و دانلود بدون ارسال مجدد فایل
-        await query.message.edit_reply_markup(
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton('????️ پخش آنلاین', url=stream_link)],
-                [InlineKeyboardButton('???? دانلود', url=download_link)],
-                [InlineKeyboardButton('???? جستجوی مجدد', switch_inline_query_current_chat="")]
-            ])
-        )
+        file_id = query.data.split("_")[1]
+
+        # تولید لینک‌های استریم و دانلود
+        stream_link = f"{URL}watch/{file_id}?hash={get_hash(file_id)}"
+        download_link = f"{URL}{file_id}?hash={get_hash(file_id)}"
+
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
+            [InlineKeyboardButton('📥 دانلود', url=download_link)],
+            [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat="")]
+        ])
+
+        if query.message:
+            # اگر پیام اصلی وجود دارد، دکمه‌های آن را تغییر می‌دهیم
+            await query.message.edit_reply_markup(reply_markup=buttons)
+        else:
+            # اگر پیام وجود ندارد، از answer استفاده می‌کنیم تا کرش نکند
+            await query.answer("🎬 برای پخش آنلاین یا دانلود، روی دکمه‌ها کلیک کنید:", show_alert=True)
 
     except Exception as e:
-        logger.exception(str(e))
+        logger.exception("❌ خطا در پردازش کال‌بک:")
         await query.answer("❌ خطایی رخ داد، لطفاً دوباره امتحان کنید.", show_alert=True)
