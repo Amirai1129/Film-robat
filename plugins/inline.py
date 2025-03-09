@@ -1,7 +1,3 @@
-# Don't Remove Credit @VJ_Botz
-# Subscribe YouTube Channel For Amazing Bot @Tech_VJ
-# Ask Doubt on telegram @KingVJ01
-
 import logging
 from pyrogram import Client, emoji, filters
 from pyrogram.errors.exceptions.bad_request_400 import QueryIdInvalid
@@ -61,24 +57,35 @@ async def answer(bot, query):
     files, next_offset, total = await get_search_results(chat_id, string, file_type=file_type, max_results=10, offset=offset)
 
     for file in files:
-        title=file['file_name']
-        size=get_size(file['file_size'])
-        f_caption=file['caption']
+        title = file['file_name']
+        size = get_size(file['file_size'])
+        f_caption = file['caption']
+
+        # فرمت‌دهی به کپشن
         if CUSTOM_FILE_CAPTION:
             try:
-                f_caption=CUSTOM_FILE_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
+                f_caption = CUSTOM_FILE_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
             except Exception as e:
                 logger.exception(e)
-                f_caption=f_caption
+                f_caption = f_caption
+
         if f_caption is None:
             f_caption = f"{file['file_name']}"
+
+        # ایجاد لینک‌های استریم و دانلود
+        stream_link = f"http://example.com/stream/{file['file_id']}"  # این لینک باید به‌درستی در سیستم شما تنظیم شود.
+        download_link = f"http://example.com/download/{file['file_id']}"  # همینطور لینک دانلود.
+
+        stream_button = InlineKeyboardButton('Stream', url=stream_link)
+        download_button = InlineKeyboardButton('Download', url=download_link)
+
         results.append(
             InlineQueryResultCachedDocument(
                 title=file['file_name'],
                 document_file_id=file['file_id'],
                 caption=f_caption,
                 description=f'Size: {get_size(file["file_size"])}',
-                reply_markup=reply_markup
+                reply_markup=InlineKeyboardMarkup([[stream_button, download_button]])
             )
         )
 
@@ -89,7 +96,7 @@ async def answer(bot, query):
         try:
             await query.answer(
                 results=results,
-                is_personal = True,
+                is_personal=True,
                 cache_time=cache_time,
                 switch_pm_text=switch_pm_text,
                 switch_pm_parameter="start",
@@ -106,19 +113,14 @@ async def answer(bot, query):
 
         await query.answer(
             results=[],
-            is_personal = True,
+            is_personal=True,
             cache_time=cache_time,
             switch_pm_text=switch_pm_text,
             switch_pm_parameter="okay"
         )
-
 
 def get_reply_markup(query):
     buttons = [[
         InlineKeyboardButton('Search again', switch_inline_query_current_chat=query)
     ]]
     return InlineKeyboardMarkup(buttons)
-
-
-
-
