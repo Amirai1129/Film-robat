@@ -18,79 +18,6 @@ async def inline_users(query: InlineQuery):
         return query.from_user and query.from_user.id in AUTH_USERS
     return query.from_user and query.from_user.id not in temp.BANNED_USERS
 
-@Client.on_inline_query()
-async def answer(bot, query):
-    """جستجوی اینلاین و نمایش فایل‌ها"""
-    chat_id = await active_connection(str(query.from_user.id))
-    
-    if not await inline_users(query):
-        await query.answer(
-            results=[], cache_time=0,
-            switch_pm_text='دسترسی شما محدود شده است!',
-            switch_pm_parameter="access_denied"
-        )
-        return
-
-    if AUTH_CHANNEL and not await is_subscribed(bot, query):
-        await query.answer(
-            results=[], cache_time=0,
-            switch_pm_text='برای استفاده، عضو کانال شوید!',
-            switch_pm_parameter="subscribe"
-        )
-        return
-
-    results = []
-    query_text = query.query.strip()
-    file_type = None
-
-    if '|' in query_text:
-        query_text, file_type = map(str.strip, query_text.split('|', maxsplit=1))
-        file_type = file_type.lower()
-
-    offset = int(query.offset or 0)
-    files, next_offset, total = await get_search_results(chat_id, query_text, file_type=file_type, max_results=10, offset=offset)
-
-    for file in files:
-        title = file['file_name']
-        size = get_size(file['file_size'])
-        caption = file.get('caption', title)
-        file_id = file['file_id']
-
-        # ایجاد دکمه کال‌بک برای ارسال استریم و دانلود
-        buttons = InlineKeyboardMarkup([[ 
-            InlineKeyboardButton("🎥 ساخت لینک دانلود مستقیم", callback_data=f"stream_{file_id}")
-        ]])
-
-        # افزودن نتیجه به لیست
-        results.append(
-            InlineQueryResultCachedDocument(
-                title=title,
-                document_file_id=file_id,
-                caption=caption,
-                description=f'حجم فایل: {size}',
-                reply_markup=buttons
-            )
-        )
-
-    # نمایش نتایج جستجو
-    switch_pm_text = f"{emoji.FILE_FOLDER} تعداد نتایج: {total}"
-    if query_text:
-        switch_pm_text += f" برای '{query_text}'"
-
-    try:
-        await query.answer(
-            results=results,
-            is_personal=True,
-            cache_time=cache_time,
-            switch_pm_text=switch_pm_text,
-            switch_pm_parameter="start",
-            next_offset=str(next_offset)
-        )
-    except QueryIdInvalid:
-        pass
-    except Exception as e:
-        logger.exception(str(e))
-
 @Client.on_callback_query(filters.regex("^stream_"))
 async def stream_callback(client, query: CallbackQuery):
     """دریافت اطلاعات فایل و ارسال لینک استریم و دانلود"""
@@ -124,10 +51,12 @@ async def stream_callback(client, query: CallbackQuery):
                     ]])
                 )
         elif query.inline_message_id:
-            # تبدیل inline_message_id به int در صورت لزوم
-            inline_message_id = query.inline_message_id
-            if isinstance(inline_message_id, str):
-                inline_message_id = int(inline_message_id, 16)  # اگر به صورت هگزا است، تبدیل به عدد صحیح
+            # بررسی فرمت inline_message_id و تبدیل به عدد صحیح در صورت لزوم
+            try:
+                inline_message_id = int(query.inline_message_id, 16)  # تلاش برای تبدیل به هگزادسیمال
+            except ValueError:
+                inline_message_id = query.inline_message_id  # اگر موفق نشد، همانطور که هست باقی بماند
+
             await client.edit_message_text(
                 chat_id=query.from_user.id,
                 message_id=inline_message_id,
@@ -143,5 +72,4 @@ async def stream_callback(client, query: CallbackQuery):
     except Exception as e:
         logger.exception(str(e))
         await query.answer("❌ خطایی رخ داد، لطفاً دوباره امتحان کنید.", show_alert=True)
-
 
