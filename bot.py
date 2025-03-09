@@ -1,4 +1,4 @@
-# Don't Remove Credit @VJ_Botz
+n# Don't Remove Credit @VJ_Botz
 # Subscribe YouTube Channel For Amazing Bot @Tech_VJ
 # Ask Doubt on telegram @KingVJ01
 
@@ -117,7 +117,7 @@ async def start():
 
     await idle()
 
-if name == '__main__':
+if __name__ == '__main__':
     try:
         asyncio.run(start())  # ✅ استفاده از asyncio.run به جای loop.run_until_complete
     except KeyboardInterrupt:
