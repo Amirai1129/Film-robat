@@ -58,7 +58,7 @@ async def answer(bot, query):
 
         # ایجاد دکمه کال‌بک برای ارسال استریم و دانلود
         buttons = InlineKeyboardMarkup([[ 
-            InlineKeyboardButton("🎥 مشاهده و دانلود", callback_data=f"stream_{file_id}") 
+            InlineKeyboardButton("🎥 مشاهده و دانلود", callback_data=f"stream_{file_id}")
         ]])
 
         # افزودن نتیجه به لیست
@@ -97,27 +97,24 @@ async def stream_callback(client, query: CallbackQuery):
     """دریافت اطلاعات فایل و ارسال لینک استریم و دانلود"""
     file_id = query.data.split("_")[1]
 
-    # بررسی اینکه آیا query.message وجود دارد یا نه
-    if query.message:
-        # ارسال فایل ویدیویی
-        sent_msg = await query.message.reply_document(
-            document=file_id,
-            caption="📂 فایل مورد نظر شما آماده است."
-        )
+    # تولید لینک‌های استریم و دانلود
+    stream_link = f"{URL}watch/{file_id}?hash={get_hash(file_id)}"
+    download_link = f"{URL}{file_id}?hash={get_hash(file_id)}"
 
-        # تولید لینک‌های استریم و دانلود
-        stream_link = f"{URL}watch/{file_id}?hash={get_hash(file_id)}"
-        download_link = f"{URL}{file_id}?hash={get_hash(file_id)}"
+    # ارسال فایل به‌صورت مستقیم (چون query.message مقدار None داره)
+    sent_msg = await client.send_document(
+        chat_id=query.from_user.id,  # پیام رو مستقیماً به کاربر بفرست
+        document=file_id,
+        caption="📂 فایل مورد نظر شما آماده است."
+    )
 
-        # ارسال دکمه‌های استریم و دانلود
-        await sent_msg.reply_text(
-            "🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
-            reply_markup=InlineKeyboardMarkup([
-[InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
-                [InlineKeyboardButton('📥 دانلود', url=download_link)],
-                [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat="")]
-            ])
-        )
-    else:
-        # در صورت عدم وجود پیام، هشدار مناسب بدهید
-        await query.answer("متاسفانه پیامی برای ارسال وجود ندارد.")
+    # ارسال دکمه‌های استریم و دانلود
+    await client.send_message(
+        chat_id=query.from_user.id,
+        text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
+            [InlineKeyboardButton('📥 دانلود', url=download_link)],
+            [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat="")]
+        ])
+    )
