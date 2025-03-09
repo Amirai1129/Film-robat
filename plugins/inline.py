@@ -1,3 +1,5 @@
+from pyrogram import client, filters
+
 @Client.on_callback_query(filters.regex("^stream_"))
 async def stream_callback(client, query: CallbackQuery):
     """ارسال دکمه‌های پخش و دانلود بدون ارسال مجدد ویدیو"""
