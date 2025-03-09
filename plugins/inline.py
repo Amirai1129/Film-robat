@@ -6,7 +6,8 @@ from database.ia_filterdb import get_search_results
 from utils import is_subscribed, get_size, temp
 from info import CACHE_TIME, AUTH_USERS, AUTH_CHANNEL, CUSTOM_FILE_CAPTION, STREAM_MODE, URL
 from database.connections_mdb import active_connection
-from TechVJ.util.file_properties import get_hash
+from urllib.parse import quote_plus
+from TechVJ.util.file_properties import get_name, get_hash
 
 logger = logging.getLogger(__name__)
 cache_time = 0 if AUTH_USERS or AUTH_CHANNEL else CACHE_TIME
@@ -57,7 +58,7 @@ async def answer(bot, query):
 
         # ایجاد دکمه کال‌بک برای ارسال استریم و دانلود
         buttons = InlineKeyboardMarkup([[ 
-            InlineKeyboardButton("???? مشاهده و دانلود", callback_data=f"stream_{file_id}")
+            InlineKeyboardButton("🎥 مشاهده و دانلود", callback_data=f"stream_{file_id}") 
         ]])
 
         # افزودن نتیجه به لیست
@@ -91,29 +92,32 @@ async def answer(bot, query):
         logger.exception(str(e))
 
 
-@app.on_callback_query(filters.regex("^stream_"))
-async def stream_callback(client: Client, query: CallbackQuery):
-    """نمایش دکمه‌های پخش و دانلود بدون ارسال مجدد ویدیو"""
-    try:
-        file_id = query.data.split("_")[1]
+@Client.on_callback_query(filters.regex("^stream_"))
+async def stream_callback(client, query: CallbackQuery):
+    """دریافت اطلاعات فایل و ارسال لینک استریم و دانلود"""
+    file_id = query.data.split("_")[1]
+
+    # بررسی اینکه آیا query.message وجود دارد یا نه
+    if query.message:
+        # ارسال فایل ویدیویی
+        sent_msg = await query.message.reply_document(
+            document=file_id,
+            caption="📂 فایل مورد نظر شما آماده است."
+        )
 
         # تولید لینک‌های استریم و دانلود
         stream_link = f"{URL}watch/{file_id}?hash={get_hash(file_id)}"
         download_link = f"{URL}{file_id}?hash={get_hash(file_id)}"
 
-        buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
-            [InlineKeyboardButton('📥 دانلود', url=download_link)],
-            [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat="")]
-        ])
-
-        if query.message:
-            # اگر پیام اصلی وجود دارد، دکمه‌های آن را تغییر می‌دهیم
-            await query.message.edit_reply_markup(reply_markup=buttons)
-        else:
-            # اگر پیام وجود ندارد، از answer استفاده می‌کنیم تا کرش نکند
-            await query.answer("🎬 برای پخش آنلاین یا دانلود، روی دکمه‌ها کلیک کنید:", show_alert=True)
-
-    except Exception as e:
-        logger.exception("❌ خطا در پردازش کال‌بک:")
-        await query.answer("❌ خطایی رخ داد، لطفاً دوباره امتحان کنید.", show_alert=True)
+        # ارسال دکمه‌های استریم و دانلود
+        await sent_msg.reply_text(
+            "🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
+                [InlineKeyboardButton('📥 دانلود', url=download_link)],
+                [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat="")]
+            ])
+        )
+    else:
+        # در صورت عدم وجود پیام، هشدار مناسب بدهید
+        await query.answer("متاسفانه پیامی برای ارسال وجود ندارد.")
