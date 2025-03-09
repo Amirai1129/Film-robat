@@ -102,31 +102,36 @@ async def stream_callback(client, query: CallbackQuery):
     download_link = f"{URL}{file_id}?hash={get_hash(file_id)}"
 
     try:
-        # چک کردن نوع فایل و ارسال مناسب
-        if query.message.chat.type == "private":
-            # اگر کاربر در چت خصوصی است، ارسال دکمه‌ها در همان چت خصوصی
-            await client.send_message(
-                chat_id=query.from_user.id,
-                text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
-                    InlineKeyboardButton('📥 دانلود', url=download_link)
-                ]])
-            )
+        # بررسی اینکه آیا query.message مقدار صحیحی دارد
+        if query.message and query.message.chat:
+            if query.message.chat.type == "private":
+                # اگر کاربر در چت خصوصی است، ارسال دکمه‌ها در همان چت خصوصی
+                await client.send_message(
+                    chat_id=query.from_user.id,
+                    text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
+                    reply_markup=InlineKeyboardMarkup([[ 
+                        InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
+                        InlineKeyboardButton('📥 دانلود', url=download_link)
+                    ]])
+                )
+            else:
+                # اگر کاربر در یک گروه است، ارسال دکمه‌ها برای هدایت به ربات
+                await client.send_message(
+                    chat_id=query.from_user.id,
+                    text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
+                    reply_markup=InlineKeyboardMarkup([[ 
+                        InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
+                        InlineKeyboardButton('📥 دانلود', url=download_link)
+                    ], [
+                        # این دکمه کاربر را مستقیماً به ربات منتقل می‌کند
+                        InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query="")
+                    ]])
+                )
         else:
-            # اگر کاربر در یک گروه است، ارسال دکمه‌ها برای هدایت به ربات
-            await client.send_message(
-                chat_id=query.from_user.id,
-                text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
-                    InlineKeyboardButton('📥 دانلود', url=download_link)
-                ], [
-                    # این دکمه کاربر را مستقیماً به ربات منتقل می‌کند
-                    InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query="")
-                ]])
-            )
+            # اگر query.message یا query.message.chat مقدار نادرستی داشت
+            logger.error("query.message or query.message.chat is None.")
     
     except Exception as e:
         logger.exception(str(e))
         await query.answer("❌ خطایی رخ داد، لطفاً دوباره امتحان کنید.", show_alert=True)
+
