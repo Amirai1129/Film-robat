@@ -102,8 +102,8 @@ async def stream_callback(client, query: CallbackQuery):
 
     try:
         if query.message:
+            # چک کردن نوع چت و ارسال پیام مناسب
             if query.message.chat.type == "private":
-                # اگر کاربر در چت خصوصی است، ارسال دکمه‌ها در همان چت خصوصی
                 await client.send_message(
                     chat_id=query.from_user.id,
                     text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
@@ -113,7 +113,6 @@ async def stream_callback(client, query: CallbackQuery):
                     ]])
                 )
             else:
-                # اگر کاربر در یک گروه است، ارسال دکمه‌ها برای هدایت به ربات
                 await client.send_message(
                     chat_id=query.from_user.id,
                     text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
@@ -121,13 +120,14 @@ async def stream_callback(client, query: CallbackQuery):
                         InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
                         InlineKeyboardButton('📥 دانلود', url=download_link)
                     ], [
-                        # این دکمه کاربر را مستقیماً به ربات منتقل می‌کند
                         InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query="")
                     ]])
                 )
         elif query.inline_message_id:
-            # در اینجا نیازی به تبدیل به int نیست
-            inline_message_id = query.inline_message_id  # استفاده از رشته مستقیم
+            # تبدیل inline_message_id به int در صورت لزوم
+            inline_message_id = query.inline_message_id
+            if isinstance(inline_message_id, str):
+                inline_message_id = int(inline_message_id, 16)  # اگر به صورت هگزا است، تبدیل به عدد صحیح
             await client.edit_message_text(
                 chat_id=query.from_user.id,
                 message_id=inline_message_id,
@@ -143,4 +143,5 @@ async def stream_callback(client, query: CallbackQuery):
     except Exception as e:
         logger.exception(str(e))
         await query.answer("❌ خطایی رخ داد، لطفاً دوباره امتحان کنید.", show_alert=True)
+
 
