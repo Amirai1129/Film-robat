@@ -111,12 +111,10 @@ async def stream_callback(client, query: CallbackQuery):
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
                     InlineKeyboardButton('📥 دانلود', url=download_link)
-                ], [
-                    InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat="")
                 ]])
             )
         else:
-            # اگر کاربر در یک گروه است، هدایت به ربات
+            # اگر کاربر در یک گروه است، ارسال دکمه‌ها برای هدایت به ربات
             await client.send_message(
                 chat_id=query.from_user.id,
                 text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
@@ -124,7 +122,8 @@ async def stream_callback(client, query: CallbackQuery):
                     InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
                     InlineKeyboardButton('📥 دانلود', url=download_link)
                 ], [
-                    InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query="")  # هدایت به ربات
+                    # این دکمه کاربر را مستقیماً به ربات منتقل می‌کند
+                    InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query="")
                 ]])
             )
     
