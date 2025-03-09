@@ -57,7 +57,7 @@ async def answer(bot, query):
         file_id = file['file_id']
 
         # ایجاد دکمه کال‌بک برای ارسال استریم و دانلود
-        buttons = InlineKeyboardMarkup([[
+        buttons = InlineKeyboardMarkup([[ 
             InlineKeyboardButton("🎥 مشاهده و دانلود", callback_data=f"stream_{file_id}")
         ]])
 
