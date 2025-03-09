@@ -2,25 +2,17 @@
 # Subscribe YouTube Channel For Amazing Bot @Tech_VJ
 # Ask Doubt on telegram @KingVJ01
 
-# Clone Code Credit : YT - @Tech_VJ / TG - @VJ_Bots / GitHub - @VJBots
-
 import sys, glob, importlib, logging, logging.config, pytz, asyncio
 from pathlib import Path
-
-# تنظیمات لاگ‌گیری
-logging.config.fileConfig('logging.conf')
-logging.getLogger().setLevel(logging.INFO)
-logging.getLogger("pyrogram").setLevel(logging.ERROR)
-logging.getLogger("cinemagoer").setLevel(logging.ERROR)
-
+from datetime import date, datetime
 from pyrogram import Client, idle
+from aiohttp import web
+
+# ماژول‌های داخلی پروژه
 from database.users_chats_db import db
 from info import *
 from utils import temp
-from typing import Union, Optional, AsyncGenerator
 from Script import script 
-from datetime import date, datetime 
-from aiohttp import web
 from plugins import web_server
 from plugins.clone import restart_bots
 
@@ -28,18 +20,23 @@ from TechVJ.bot import TechVJBot
 from TechVJ.util.keepalive import ping_server
 from TechVJ.bot.clients import initialize_clients
 
+# تنظیمات لاگ‌گیری
+logging.config.fileConfig('logging.conf')
+logging.getLogger().setLevel(logging.INFO)
+logging.getLogger("pyrogram").setLevel(logging.ERROR)
+logging.getLogger("cinemagoer").setLevel(logging.ERROR)
+
+# بارگذاری پلاگین‌ها
 ppath = "plugins/*.py"
 files = glob.glob(ppath)
 
-# جلوگیری از ورود مجدد در صورت اتصال
-if not TechVJBot.is_connected:
-    TechVJBot.start()
-
-loop = asyncio.get_event_loop()
-
 async def start():
     print('\n✅ ربات در حال اجرا است...')
-    
+
+    # بررسی وضعیت اتصال ربات
+    if not await TechVJBot.is_connected:
+        await TechVJBot.start()
+
     # گرفتن اطلاعات ربات
     bot_info = await TechVJBot.get_me()
     await initialize_clients()
@@ -106,8 +103,8 @@ async def start():
     except:
         print("⚠️ لطفاً ربات را در کانال فورس سابسکرایب ادمین کنید.")
 
-    # ری‌استارت کردن بات‌های کلون (در صورت فعال بودن)
-    if CLONE_MODE:
+    # ری‌استارت کردن بات‌های کلون (در صورت فعال بودن و داشتن بات کلون)
+    if CLONE_MODE and len(await restart_bots()) > 0:
         print("♻️ در حال ری‌استارت تمامی بات‌های کلون...")
         await restart_bots()
         print("✅ تمامی بات‌های کلون ری‌استارت شدند.")
@@ -120,9 +117,8 @@ async def start():
 
     await idle()
 
-
-if __name__ == '__main__':
+if name == '__main__':
     try:
-        loop.run_until_complete(start())
+        asyncio.run(start())  # ✅ استفاده از asyncio.run به جای loop.run_until_complete
     except KeyboardInterrupt:
         logging.info("🛑 سرویس متوقف شد. خداحافظ 👋")
