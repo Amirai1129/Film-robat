@@ -126,8 +126,8 @@ async def stream_callback(client, query: CallbackQuery):
                     ]])
                 )
         elif query.inline_message_id:
-            # بررسی اینکه inline_message_id از نوع عددی باشد
-            inline_message_id = int(query.inline_message_id)  # تبدیل به int
+            # در اینجا نیازی به تبدیل به int نیست
+            inline_message_id = query.inline_message_id  # استفاده از رشته مستقیم
             await client.edit_message_text(
                 chat_id=query.from_user.id,
                 message_id=inline_message_id,
