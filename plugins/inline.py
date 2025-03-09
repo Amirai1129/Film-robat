@@ -1,75 +1,134 @@
 import logging
+import aiohttp
+import uuid
 from pyrogram import Client, emoji, filters
 from pyrogram.errors.exceptions.bad_request_400 import QueryIdInvalid
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultCachedDocument, InlineQuery, CallbackQuery
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultArticle, InputTextMessageContent, InlineQuery, CallbackQuery
 from database.ia_filterdb import get_search_results
 from utils import is_subscribed, get_size, temp
-from info import CACHE_TIME, AUTH_USERS, AUTH_CHANNEL, CUSTOM_FILE_CAPTION, STREAM_MODE, URL
+from info import CACHE_TIME, AUTH_USERS, AUTH_CHANNEL, STREAM_MODE, URL
 from database.connections_mdb import active_connection
-from urllib.parse import quote_plus
-from TechVJ.util.file_properties import get_name, get_hash
+from TechVJ.util.file_properties import get_hash
 
+# تنظیمات لاگ‌گیری
 logger = logging.getLogger(__name__)
 cache_time = 0 if AUTH_USERS or AUTH_CHANNEL else CACHE_TIME
 
-async def inline_users(query: InlineQuery):
-    """بررسی دسترسی کاربران به جستجوی اینلاین"""
-    if AUTH_USERS:
-        return query.from_user and query.from_user.id in AUTH_USERS
-    return query.from_user and query.from_user.id not in temp.BANNED_USERS
+# کلید API برای IMDb (OMDb API)
+OMDB_API_KEY = "کلید-OMDB-شما"
+
+async def get_movie_info(title):
+    """دریافت اطلاعات فیلم از IMDb با استفاده از OMDb API"""
+    url = f"http://www.omdbapi.com/?t={title}&apikey={OMDB_API_KEY}"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                if data.get("Response") == "True":
+                    return {
+                        "title": data.get("Title"),
+                        "year": data.get("Year"),
+                        "rating": data.get("imdbRating"),
+                        "genre": data.get("Genre"),
+                        "poster": data.get("Poster"),
+                        "plot": data.get("Plot"),
+                        "imdb_link": f"https://www.imdb.com/title/{data.get('imdbID')}/",
+                        "trailer": f"https://www.youtube.com/results?search_query={title.replace(' ', '+')}+trailer"
+                    }
+    return None  # در صورت یافت نشدن اطلاعات
+
+
+@Client.on_inline_query()
+async def answer(bot, query):
+    """جستجوی اینلاین با نمایش اطلاعات IMDb و دکمه‌های اختصاصی"""
+    chat_id = await active_connection(str(query.from_user.id))
+
+    if not query.query.strip():
+        await query.answer([], cache_time=0)
+        return
+
+    movie_info = await get_movie_info(query.query.strip())
+    if not movie_info:
+        await query.answer([], cache_time=0, switch_pm_text="فیلمی یافت نشد!")
+        return
+
+    buttons = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎥 نمایش فایل‌های مرتبط", callback_data=f"show_files_{query.query.strip()}")],
+        [InlineKeyboardButton("📺 تماشای تریلر", url=movie_info['trailer']),
+         InlineKeyboardButton("ℹ️ اطلاعات IMDb", url=movie_info['imdb_link'])],
+        [InlineKeyboardButton("🔍 جستجوی مجدد", switch_inline_query="")]
+    ])
+
+    results = [
+        InlineQueryResultArticle(
+            id=str(uuid.uuid4()),
+            title=f"{movie_info['title']} ({movie_info['year']})",
+            description=f"⭐ امتیاز IMDb: {movie_info['rating']} | 🎭 ژانر: {movie_info['genre']}",
+            thumb_url=movie_info['poster'],
+            input_message_content=InputTextMessageContent(
+                message_text=f"🎬 *{movie_info['title']}* ({movie_info['year']})\n\n"
+                             f"⭐ *امتیاز:* {movie_info['rating']}\n"
+                             f"🎭 *ژانر:* {movie_info['genre']}\n"
+                             f"📜 *داستان:* {movie_info['plot']}\n\n"
+                             f"[📸 کاور]({movie_info['poster']})",
+                parse_mode="markdown",
+                disable_web_page_preview=False
+            ),
+            reply_markup=buttons
+        )
+    ]
+
+    await query.answer(results, is_personal=True, cache_time=cache_time)
+
+
+@Client.on_callback_query(filters.regex("^show_files_"))
+async def show_files(client, query: CallbackQuery):
+    """نمایش فایل‌های ایندکس شده برای فیلم انتخاب‌شده"""
+    movie_title = query.data.split("_", 2)[2]
+    chat_id = await active_connection(str(query.from_user.id))
+    files, _, _ = await get_search_results(chat_id, movie_title, max_results=10)
+
+    if not files:
+        await query.answer("❌ هیچ فایلی برای این فیلم یافت نشد!", show_alert=True)
+        return
+
+    for file in files:
+        title = file['file_name']
+        size = get_size(file['file_size'])
+        file_id = file['file_id']
+
+        buttons = InlineKeyboardMarkup([[ 
+            InlineKeyboardButton("🎥 پخش آنلاین", callback_data=f"stream_{file_id}"),
+            InlineKeyboardButton("📥 دانلود", callback_data=f"download_{file_id}")
+        ]])
+
+        await client.send_document(
+            chat_id=query.from_user.id,
+            document=file_id,
+            caption=f"🎬 {title}\nحجم: {size}",
+            reply_markup=buttons
+        )
+
+    await query.answer()
+
 
 @Client.on_callback_query(filters.regex("^stream_"))
 async def stream_callback(client, query: CallbackQuery):
-    """دریافت اطلاعات فایل و ارسال لینک استریم و دانلود"""
+    """ارسال لینک‌های پخش آنلاین و دانلود"""
     file_id = query.data.split("_")[1]
-
-    # تولید لینک‌های استریم و دانلود
     stream_link = f"{URL}watch/{file_id}?hash={get_hash(file_id)}"
     download_link = f"{URL}{file_id}?hash={get_hash(file_id)}"
 
-    try:
-        if query.message:
-            # چک کردن نوع چت و ارسال پیام مناسب
-            if query.message.chat.type == "private":
-                await client.send_message(
-                    chat_id=query.from_user.id,
-                    text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
-                    reply_markup=InlineKeyboardMarkup([[ 
-                        InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
-                        InlineKeyboardButton('📥 دانلود', url=download_link)
-                    ]])
-                )
-            else:
-                await client.send_message(
-                    chat_id=query.from_user.id,
-                    text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
-                    reply_markup=InlineKeyboardMarkup([[ 
-                        InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
-                        InlineKeyboardButton('📥 دانلود', url=download_link)
-                    ], [
-                        InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query="")
-                    ]])
-                )
-        elif query.inline_message_id:
-            # بررسی فرمت inline_message_id و تبدیل به عدد صحیح در صورت لزوم
-            try:
-                inline_message_id = int(query.inline_message_id, 16)  # تلاش برای تبدیل به هگزادسیمال
-            except ValueError:
-                inline_message_id = query.inline_message_id  # اگر موفق نشد، همانطور که هست باقی بماند
+    buttons = InlineKeyboardMarkup([
+        [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
+         InlineKeyboardButton('📥 دانلود', url=download_link)],
+        [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query="")]
+    ])
 
-            await client.edit_message_text(
-                chat_id=query.from_user.id,
-                message_id=inline_message_id,
-                text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
-                reply_markup=InlineKeyboardMarkup([[ 
-                    InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link),
-                    InlineKeyboardButton('📥 دانلود', url=download_link)
-                ]])
-            )
-        else:
-            logger.error("No valid message or inline_message_id.")
-    
-    except Exception as e:
-        logger.exception(str(e))
-        await query.answer("❌ خطایی رخ داد، لطفاً دوباره امتحان کنید.", show_alert=True)
-
+    await client.send_message(
+        chat_id=query.from_user.id,
+        text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
+        reply_markup=buttons
+    )
+    await query.answer()
