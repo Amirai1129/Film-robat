@@ -1,7 +1,7 @@
 import logging
 from pyrogram import Client, emoji, filters
 from pyrogram.errors.exceptions.bad_request_400 import QueryIdInvalid
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultCachedDocument, InlineQuery
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultCachedDocument, InlineQuery, CallbackQuery
 from database.ia_filterdb import get_search_results
 from utils import is_subscribed, get_size, temp
 from info import CACHE_TIME, AUTH_USERS, AUTH_CHANNEL, CUSTOM_FILE_CAPTION, STREAM_MODE, URL
@@ -20,7 +20,7 @@ async def inline_users(query: InlineQuery):
 
 @Client.on_inline_query()
 async def answer(bot, query):
-    """جستجوی اینلاین و نمایش فایل‌ها همراه با دکمه‌های استریم و دانلود"""
+    """جستجوی اینلاین و نمایش فایل‌ها"""
     chat_id = await active_connection(str(query.from_user.id))
     
     if not await inline_users(query):
@@ -54,29 +54,12 @@ async def answer(bot, query):
         title = file['file_name']
         size = get_size(file['file_size'])
         caption = file.get('caption', title)
-
-        # قالب‌بندی کپشن سفارشی
-        if CUSTOM_FILE_CAPTION:
-            try:
-                caption = CUSTOM_FILE_CAPTION.format(
-                    file_name=title or '', 
-                    file_size=size or '', 
-                    file_caption=caption or ''
-                )
-            except Exception as e:
-                logger.exception(e)
-
-        # تولید لینک‌های استریم و دانلود از طریق فایل‌اید تلگرام
         file_id = file['file_id']
-        stream_link = f"{URL}watch/{file_id}/{quote_plus(title)}?hash={get_hash(file_id)}"
-        download_link = f"{URL}{file_id}/{quote_plus(title)}?hash={get_hash(file_id)}"
 
-        # دکمه‌های استریم، دانلود و جستجوی مجدد
-        buttons = [
-            [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
-            [InlineKeyboardButton('📥 دانلود', url=download_link)],
-            [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat=query_text)]
-        ]
+        # ایجاد دکمه کال‌بک برای ارسال استریم و دانلود
+        buttons = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🎥 مشاهده و دانلود", callback_data=f"stream_{file_id}")
+        ]])
 
         # افزودن نتیجه به لیست
         results.append(
@@ -85,7 +68,7 @@ async def answer(bot, query):
                 document_file_id=file_id,
                 caption=caption,
                 description=f'حجم فایل: {size}',
-                reply_markup=InlineKeyboardMarkup(buttons)
+                reply_markup=buttons
             )
         )
 
@@ -107,3 +90,29 @@ async def answer(bot, query):
         pass
     except Exception as e:
         logger.exception(str(e))
+
+
+@Client.on_callback_query(filters.regex("^stream_"))
+async def stream_callback(client, query: CallbackQuery):
+    """دریافت اطلاعات فایل و ارسال لینک استریم و دانلود"""
+    file_id = query.data.split("_")[1]
+
+    # ارسال فایل ویدیویی
+    sent_msg = await query.message.reply_document(
+        document=file_id,
+        caption="📂 فایل مورد نظر شما آماده است."
+    )
+
+    # تولید لینک‌های استریم و دانلود
+    stream_link = f"{URL}watch/{file_id}?hash={get_hash(file_id)}"
+    download_link = f"{URL}{file_id}?hash={get_hash(file_id)}"
+
+    # ارسال دکمه‌های استریم و دانلود
+    await sent_msg.reply_text(
+        "🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
+            [InlineKeyboardButton('📥 دانلود', url=download_link)],
+            [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat="")]
+        ])
+    )
