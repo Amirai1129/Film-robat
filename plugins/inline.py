@@ -6,8 +6,7 @@ from database.ia_filterdb import get_search_results
 from utils import is_subscribed, get_size, temp
 from info import CACHE_TIME, AUTH_USERS, AUTH_CHANNEL, CUSTOM_FILE_CAPTION, STREAM_MODE, URL
 from database.connections_mdb import active_connection
-from urllib.parse import quote_plus
-from TechVJ.util.file_properties import get_name, get_hash
+from TechVJ.util.file_properties import get_hash
 
 logger = logging.getLogger(__name__)
 cache_time = 0 if AUTH_USERS or AUTH_CHANNEL else CACHE_TIME
@@ -58,7 +57,7 @@ async def answer(bot, query):
 
         # ایجاد دکمه کال‌بک برای ارسال استریم و دانلود
         buttons = InlineKeyboardMarkup([[ 
-            InlineKeyboardButton("🎥 مشاهده و دانلود", callback_data=f"stream_{file_id}")
+            InlineKeyboardButton("???? مشاهده و دانلود", callback_data=f"stream_{file_id}")
         ]])
 
         # افزودن نتیجه به لیست
@@ -94,7 +93,7 @@ async def answer(bot, query):
 
 @Client.on_callback_query(filters.regex("^stream_"))
 async def stream_callback(client, query: CallbackQuery):
-    """دریافت اطلاعات فایل و ارسال لینک استریم و دانلود"""
+    """ارسال دکمه‌های پخش و دانلود بدون ارسال مجدد ویدیو"""
     file_id = query.data.split("_")[1]
 
     # تولید لینک‌های استریم و دانلود
@@ -102,32 +101,15 @@ async def stream_callback(client, query: CallbackQuery):
     download_link = f"{URL}{file_id}?hash={get_hash(file_id)}"
 
     try:
-        # چک کردن نوع فایل و ارسال مناسب
-        sent_msg = None
-        if file_id.startswith("BAAC"):  # اگر فایل از نوع DOCUMENT است
-            sent_msg = await client.send_document(
-                chat_id=query.from_user.id,
-                document=file_id,
-                caption="📂 فایل مورد نظر شما آماده است."
-            )
-        else:  # اگر ویدیو بود
-            sent_msg = await client.send_video(
-                chat_id=query.from_user.id,
-                video=file_id,
-                caption="📂 فایل مورد نظر شما آماده است."
-            )
-
-        # ارسال دکمه‌های استریم و دانلود
-        await client.send_message(
-            chat_id=query.from_user.id,
-            text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
+        # ویرایش پیام قبلی و افزودن دکمه‌های استریم و دانلود بدون ارسال مجدد فایل
+        await query.message.edit_reply_markup(
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
-                [InlineKeyboardButton('📥 دانلود', url=download_link)],
-                [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat="")]
+                [InlineKeyboardButton('????️ پخش آنلاین', url=stream_link)],
+                [InlineKeyboardButton('???? دانلود', url=download_link)],
+                [InlineKeyboardButton('???? جستجوی مجدد', switch_inline_query_current_chat="")]
             ])
         )
-    
+
     except Exception as e:
         logger.exception(str(e))
         await query.answer("❌ خطایی رخ داد، لطفاً دوباره امتحان کنید.", show_alert=True)
