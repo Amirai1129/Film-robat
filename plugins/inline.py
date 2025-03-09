@@ -101,20 +101,33 @@ async def stream_callback(client, query: CallbackQuery):
     stream_link = f"{URL}watch/{file_id}?hash={get_hash(file_id)}"
     download_link = f"{URL}{file_id}?hash={get_hash(file_id)}"
 
-    # ارسال فایل به‌صورت مستقیم (چون query.message مقدار None داره)
-    sent_msg = await client.send_document(
-        chat_id=query.from_user.id,  # پیام رو مستقیماً به کاربر بفرست
-        document=file_id,
-        caption="📂 فایل مورد نظر شما آماده است."
-    )
+    try:
+        # چک کردن نوع فایل و ارسال مناسب
+        sent_msg = None
+        if file_id.startswith("BAAC"):  # اگر فایل از نوع DOCUMENT است
+            sent_msg = await client.send_document(
+                chat_id=query.from_user.id,
+                document=file_id,
+                caption="📂 فایل مورد نظر شما آماده است."
+            )
+        else:  # اگر ویدیو بود
+            sent_msg = await client.send_video(
+                chat_id=query.from_user.id,
+                video=file_id,
+                caption="📂 فایل مورد نظر شما آماده است."
+            )
 
-    # ارسال دکمه‌های استریم و دانلود
-    await client.send_message(
-        chat_id=query.from_user.id,
-        text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
-            [InlineKeyboardButton('📥 دانلود', url=download_link)],
-            [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat="")]
-        ])
-    )
+        # ارسال دکمه‌های استریم و دانلود
+        await client.send_message(
+            chat_id=query.from_user.id,
+            text="🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
+                [InlineKeyboardButton('📥 دانلود', url=download_link)],
+                [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat="")]
+            ])
+        )
+    
+    except Exception as e:
+        logger.exception(str(e))
+        await query.answer("❌ خطایی رخ داد، لطفاً دوباره امتحان کنید.", show_alert=True)
