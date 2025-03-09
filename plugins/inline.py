@@ -4,123 +4,106 @@ from pyrogram.errors.exceptions.bad_request_400 import QueryIdInvalid
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultCachedDocument, InlineQuery
 from database.ia_filterdb import get_search_results
 from utils import is_subscribed, get_size, temp
-from info import CACHE_TIME, AUTH_USERS, AUTH_CHANNEL, CUSTOM_FILE_CAPTION
+from info import CACHE_TIME, AUTH_USERS, AUTH_CHANNEL, CUSTOM_FILE_CAPTION, STREAM_MODE, URL
 from database.connections_mdb import active_connection
+from urllib.parse import quote_plus
+from TechVJ.util.file_properties import get_name, get_hash
 
 logger = logging.getLogger(__name__)
 cache_time = 0 if AUTH_USERS or AUTH_CHANNEL else CACHE_TIME
 
 async def inline_users(query: InlineQuery):
+    """بررسی دسترسی کاربران به جستجوی اینلاین"""
     if AUTH_USERS:
-        if query.from_user and query.from_user.id in AUTH_USERS:
-            return True
-        else:
-            return False
-    if query.from_user and query.from_user.id not in temp.BANNED_USERS:
-        return True
-    return False
+        return query.from_user and query.from_user.id in AUTH_USERS
+    return query.from_user and query.from_user.id not in temp.BANNED_USERS
 
 @Client.on_inline_query()
 async def answer(bot, query):
-    """Show search results for given inline query"""
+    """جستجوی اینلاین و نمایش فایل‌ها همراه با دکمه‌های استریم و دانلود"""
     chat_id = await active_connection(str(query.from_user.id))
     
     if not await inline_users(query):
         await query.answer(
-            results=[],
-            cache_time=0,
-            switch_pm_text='okDa',
-            switch_pm_parameter="hehe"
+            results=[], cache_time=0,
+            switch_pm_text='دسترسی شما محدود شده است!',
+            switch_pm_parameter="access_denied"
         )
         return
 
     if AUTH_CHANNEL and not await is_subscribed(bot, query):
         await query.answer(
-            results=[],
-            cache_time=0,
-            switch_pm_text='You have to subscribe my channel to use the bot',
+            results=[], cache_time=0,
+            switch_pm_text='برای استفاده، عضو کانال شوید!',
             switch_pm_parameter="subscribe"
         )
         return
 
     results = []
-    if '|' in query.query:
-        string, file_type = query.query.split('|', maxsplit=1)
-        string = string.strip()
-        file_type = file_type.strip().lower()
-    else:
-        string = query.query.strip()
-        file_type = None
+    query_text = query.query.strip()
+    file_type = None
+
+    if '|' in query_text:
+        query_text, file_type = map(str.strip, query_text.split('|', maxsplit=1))
+        file_type = file_type.lower()
 
     offset = int(query.offset or 0)
-    reply_markup = get_reply_markup(query=string)
-    files, next_offset, total = await get_search_results(chat_id, string, file_type=file_type, max_results=10, offset=offset)
+    files, next_offset, total = await get_search_results(chat_id, query_text, file_type=file_type, max_results=10, offset=offset)
 
     for file in files:
         title = file['file_name']
         size = get_size(file['file_size'])
-        f_caption = file['caption']
+        caption = file.get('caption', title)
 
-        # فرمت‌دهی به کپشن
+        # قالب‌بندی کپشن سفارشی
         if CUSTOM_FILE_CAPTION:
             try:
-                f_caption = CUSTOM_FILE_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
+                caption = CUSTOM_FILE_CAPTION.format(
+                    file_name=title or '', 
+                    file_size=size or '', 
+                    file_caption=caption or ''
+                )
             except Exception as e:
                 logger.exception(e)
-                f_caption = f_caption
 
-        if f_caption is None:
-            f_caption = f"{file['file_name']}"
+        # تولید لینک‌های استریم و دانلود از طریق فایل‌اید تلگرام
+        file_id = file['file_id']
+        stream_link = f"{URL}watch/{file_id}/{quote_plus(title)}?hash={get_hash(file_id)}"
+        download_link = f"{URL}{file_id}/{quote_plus(title)}?hash={get_hash(file_id)}"
 
-        # ایجاد لینک‌های استریم و دانلود
-        stream_link = f"http://example.com/stream/{file['file_id']}"  # این لینک باید به‌درستی در سیستم شما تنظیم شود.
-        download_link = f"http://example.com/download/{file['file_id']}"  # همینطور لینک دانلود.
+        # دکمه‌های استریم، دانلود و جستجوی مجدد
+        buttons = [
+            [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
+            [InlineKeyboardButton('📥 دانلود', url=download_link)],
+            [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat=query_text)]
+        ]
 
-        stream_button = InlineKeyboardButton('Stream', url=stream_link)
-        download_button = InlineKeyboardButton('Download', url=download_link)
-
+        # افزودن نتیجه به لیست
         results.append(
             InlineQueryResultCachedDocument(
-                title=file['file_name'],
-                document_file_id=file['file_id'],
-                caption=f_caption,
-                description=f'Size: {get_size(file["file_size"])}',
-                reply_markup=InlineKeyboardMarkup([[stream_button, download_button]])
+                title=title,
+                document_file_id=file_id,
+                caption=caption,
+                description=f'حجم فایل: {size}',
+                reply_markup=InlineKeyboardMarkup(buttons)
             )
         )
 
-    if results:
-        switch_pm_text = f"{emoji.FILE_FOLDER} Results - {total}"
-        if string:
-            switch_pm_text += f" for {string}"
-        try:
-            await query.answer(
-                results=results,
-                is_personal=True,
-                cache_time=cache_time,
-                switch_pm_text=switch_pm_text,
-                switch_pm_parameter="start",
-                next_offset=str(next_offset)
-            )
-        except QueryIdInvalid:
-            pass
-        except Exception as e:
-            logging.exception(str(e))
-    else:
-        switch_pm_text = f'{emoji.CROSS_MARK} No results'
-        if string:
-            switch_pm_text += f' for "{string}"'
+    # نمایش نتایج جستجو
+    switch_pm_text = f"{emoji.FILE_FOLDER} تعداد نتایج: {total}"
+    if query_text:
+        switch_pm_text += f" برای '{query_text}'"
 
+    try:
         await query.answer(
-            results=[],
+            results=results,
             is_personal=True,
             cache_time=cache_time,
             switch_pm_text=switch_pm_text,
-            switch_pm_parameter="okay"
+            switch_pm_parameter="start",
+            next_offset=str(next_offset)
         )
-
-def get_reply_markup(query):
-    buttons = [[
-        InlineKeyboardButton('Search again', switch_inline_query_current_chat=query)
-    ]]
-    return InlineKeyboardMarkup(buttons)
+    except QueryIdInvalid:
+        pass
+    except Exception as e:
+        logger.exception(str(e))
