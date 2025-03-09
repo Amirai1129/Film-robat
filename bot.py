@@ -137,7 +137,7 @@ async def start():
 
     await idle()
 
-if name == '__main__':
+if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(start())
