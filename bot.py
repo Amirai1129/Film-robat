@@ -26,6 +26,10 @@ logging.getLogger().setLevel(logging.INFO)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 logging.getLogger("cinemagoer").setLevel(logging.ERROR)
 
+# بررسی مقدار TechVJBot
+if TechVJBot is None:
+    raise ValueError("❌ خطا: TechVJBot مقدار None دارد! لطفاً تنظیمات را بررسی کنید.")
+
 # بارگذاری پلاگین‌ها
 ppath = "plugins/*.py"
 files = glob.glob(ppath)
@@ -34,8 +38,12 @@ async def start():
     print('\n✅ ربات در حال اجرا است...')
 
     # بررسی وضعیت اتصال ربات
-    if not await TechVJBot.is_connected:
-        await TechVJBot.start()
+    try:
+        if not TechVJBot.is_connected:
+            await TechVJBot.start()
+    except Exception as e:
+        print(f"⚠️ خطا در استارت ربات: {e}")
+        return
 
     # گرفتن اطلاعات ربات
     bot_info = await TechVJBot.get_me()
@@ -104,16 +112,22 @@ async def start():
         print("⚠️ لطفاً ربات را در کانال فورس سابسکرایب ادمین کنید.")
 
     # ری‌استارت کردن بات‌های کلون (در صورت فعال بودن و داشتن بات کلون)
-    if CLONE_MODE and len(await restart_bots()) > 0:
-        print("♻️ در حال ری‌استارت تمامی بات‌های کلون...")
-        await restart_bots()
-        print("✅ تمامی بات‌های کلون ری‌استارت شدند.")
+    if CLONE_MODE:
+        try:
+            print("♻️ در حال ری‌استارت تمامی بات‌های کلون...")
+            await restart_bots()
+            print("✅ تمامی بات‌های کلون ری‌استارت شدند.")
+        except Exception as e:
+            print(f"⚠️ خطا در ری‌استارت بات‌های کلون: {e}")
 
     # راه‌اندازی وب سرور
-    app = web.AppRunner(await web_server())
-    await app.setup()
-    bind_address = "0.0.0.0"
-    await web.TCPSite(app, bind_address, PORT).start()
+    try:
+        app = web.AppRunner(await web_server())
+        await app.setup()
+        bind_address = "0.0.0.0"
+        await web.TCPSite(app, bind_address, PORT).start()
+    except Exception as e:
+        print(f"⚠️ خطا در راه‌اندازی وب سرور: {e}")
 
     await idle()
 
