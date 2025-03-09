@@ -1,4 +1,3 @@
-A, [09.03.2025 15:57]
 import logging
 from pyrogram import Client, emoji, filters
 from pyrogram.errors.exceptions.bad_request_400 import QueryIdInvalid
@@ -114,8 +113,6 @@ async def stream_callback(client, query: CallbackQuery):
         await sent_msg.reply_text(
             "🎬 برای تماشای آنلاین یا دانلود، روی گزینه‌های زیر کلیک کنید:",
             reply_markup=InlineKeyboardMarkup([
-
-A, [09.03.2025 15:57]
 [InlineKeyboardButton('🖥️ پخش آنلاین', url=stream_link)],
                 [InlineKeyboardButton('📥 دانلود', url=download_link)],
                 [InlineKeyboardButton('🔍 جستجوی مجدد', switch_inline_query_current_chat="")]
